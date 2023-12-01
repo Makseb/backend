@@ -1369,12 +1369,15 @@ router.get('/category/:categoryId', async (req, res) => {
 });
 router.post('/addTax', async (req, res) => {
   try {
-    const { name, rate } = req.body;
-
+    const { name, rate, storeId } = req.body;
+console.log(name);
+console.log(rate);
+console
     // Create the new tax with the provided details
     const tax = new Tax({
       name,
       rate,
+      storeId,
     });
 
     // Save the tax to the database
@@ -1402,15 +1405,29 @@ router.get('/getTax/:taxId', async (req, res) => {
     res.status(500).json({ message: 'An error occurred while getting all taxes' });
   }
 });
-router.get('/getAllTax', async (req, res) => {
+router.get('/getTaxbystore/:store', async (req, res) => {
   try {
+    const store=req.params.store
+    
+
+    const taxes = await Tax.find({storeId:store})
+    
+    res.status(200).json({ taxes });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'An error occurred while getting all taxes' });
+  }
+});
+router.get('/getAllTax/:store', async (req, res) => {
+  try {
+    const store=req.params.store
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
 
     const totalDocuments = await Tax.countDocuments();
     const totalPages = Math.ceil(totalDocuments / limit);
 
-    const taxes = await Tax.find()
+    const taxes = await Tax.find({storeId:store})
       .skip((page - 1) * limit)
       .limit(limit);
 
@@ -1455,11 +1472,11 @@ router.delete('/deleteTax/:taxId', async (req, res) => {
       return res.status(404).json({ message: 'Tax not found' });
     }
 
-    // Find and update the products that have this tax in their taxes array
-    await Product.updateMany(
-      { taxes: taxId },
-      { $pull: { taxes: taxId } }
-    );
+    // // Find and update the products that have this tax in their taxes array
+    // await Product.updateMany(
+    //   { taxes: taxId },
+    //   { $pull: { taxes: taxId } }
+    // );
 
     // Delete the tax from the database
     await existingTax.deleteOne();
@@ -2540,7 +2557,269 @@ router.post('/addOptionGroupToOG/:optionGroupId/:parentOptionGroupId/:optionId',
   }
 });
 
-module.exports = router;
+// Route to add a product
+// router.post('/addProduct2', async (req, res) => {
+//   try {
+//     // Extract data from the request body
+//     const { name, description, availability, storeId, category, modePrice, image, size, optionGroups, taxes } = req.body;
+
+//     // Create a new product instance
+//     const newProduct = new Product({
+//       name,
+//       description,
+//       availability,
+//       storeId,
+//       category,
+//       modePrice,
+//       image,
+//       size,
+//       optionGroups,
+//       taxes,
+//     });
+
+//     // Save the product to the database
+//     const savedProduct = await newProduct.save();
+
+//     res.json(savedProduct);
+//   } catch (error) {
+//     res.status(500).json({ error: error.message });
+//   }
+// });
+// router.get('/product2/:productId/mode/:modeId', async (req, res) => {
+//   try {
+//     const productId = req.params.productId;
+//     const modeId = req.params.modeId;
+
+//     // Find the product by ID and use lean() to get a plain JavaScript object
+//     const product = await Product.findById(productId).lean();
+
+//     if (!product) {
+//       return res.status(404).json({ message: 'Product not found' });
+//     }
+
+//     // Check if the mode is present in the modePrice array
+//     const modeDetails = product.modePrice.find((modePrice) => modePrice.mode.toString() === modeId);
+
+//     if (modeDetails) {
+//       const result = {
+//         name: product.name,
+//         description: product.description,
+//         sizeModeDetails: [],
+//       };
+//       res.json(result);
+//       return;
+//     }
+
+//     // If not found in modePrice, check the mode in the size array
+//     const result = {
+//       name: product.name,
+//       description: product.description,
+
+//       sizeModeDetails: [],
+//     };
+
+//     product.size.forEach((size) => {
+//       const modeInSize = size.modePrice.find((sizeMode) => sizeMode.mode.toString() === modeId);
+//       if (modeInSize) {
+//         result.sizeModeDetails.push({
+//           sizeName: size.name,
+//           modeDetails: modeInSize,
+//         });
+//       }
+//     });
+
+//     if (result.sizeModeDetails.length > 0) {
+//       res.json(result);
+//     } else {
+//       res.status(404).json({ message: 'Mode not found in product' });
+//     }
+//   } catch (error) {
+//     res.status(500).json({ error: error.message });
+//   }
+// });
+router.post('/add-product2', async (req, res) => {
+  try {
+    // Extracting data from the request body
+    const {
+      name,
+      description,
+      availabilitys,
+      storeId,
+      category,
+      price,
+      image,
+      size,
+      optionGroups,
+      taxes,
+    } = req.body;
+
+    // Creating a new product instance
+    const newProduct = new Product({
+      name,
+      description,
+      availabilitys,
+      storeId,
+      category,
+      price,
+      image,
+      size,
+      optionGroups,
+      taxes,
+    });
+
+    // Saving the new product to the database
+    const savedProduct = await newProduct.save();
+
+    // Sending the saved product as a response
+    res.json(savedProduct);
+  } catch (error) {
+    // Handling errors
+    console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+router.get('/product-details/:productId', async (req, res) => {
+  try {
+    const productId = req.params.productId;
+
+    // Find the product by ID
+    const product = await Product.findById(productId)
+      .populate({
+        path: 'taxes',
+        model: Tax,
+        populate: {
+          path: 'mode',
+          model: ConsumationMode,
+        },
+      })
+      .populate({
+        path: 'availabilitys.mode',
+        model: ConsumationMode,
+      })
+      .exec();
+
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    res.json(product);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+})
+
+
+// API endpoint to get product details with specific tax and availability modes based on a single mode ID
+router.get('/product-details/:productId/:modeId', async (req, res) => {
+  try {
+    const productId = req.params.productId;
+    const modeId = req.params.modeId;
+
+    const product = await Product.findById(productId)
+      .populate({
+        path: 'taxes',
+        match: { 'mode': modeId },
+ 
+      })
+      .populate({
+        path: 'availabilitys',
+        match: { 'mode': modeId },
+      })
+      .exec();
+
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const { _id, name, description, availabilitys, storeId, category, price, image, taxes } = product;
+
+    // Extract only relevant details for the specified mode ID
+    const filteredProduct = {
+      _id,
+      name,
+      description,
+      availabilitys: availabilitys.filter(avail => avail.mode.toString() === modeId),
+      storeId,
+      category,
+      price,
+      image,
+      taxes: taxes.filter(tax => tax.mode.toString() === modeId),
+    };
+
+    res.json(filteredProduct);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+router.get('/products-by-category/:categoryId/:modeId', async (req, res) => {
+  try {
+    const categoryId = req.params.categoryId;
+    const modeId = req.params.modeId;
+
+    const products = await Product.find({ category: categoryId }).populate({
+      path: 'size.optionGroups', // Populate the optionGroups field within each size
+    }).populate('optionGroups')
+      .populate({
+        path: 'taxes',
+        match: { 'mode': modeId },
+        select: 'mode',
+       
+      })
+      .populate({
+        path: 'availabilitys',
+        match: { 'mode': modeId },
+        select: 'mode',
+      })
+      .exec();
+
+    // Filter products based on the specified mode ID
+    const filteredProducts = products.map(product => {
+      const { _id, name, description, availabilitys,size,optionGroups, storeId, category, price, image, taxes } = product;
+
+      return {
+        _id,
+        name,
+        description,
+        availabilitys: availabilitys.filter(avail => avail.mode.toString() === modeId),
+        size,
+        optionGroups,
+        storeId,
+        category,
+
+        price,
+        image,
+        taxes: taxes.filter(tax => tax.mod === modeId),
+      };
+    });
+
+    res.json(filteredProducts);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+//get product By Category
+router.get("/productByCategory/:categoryId", async (req, res) => {
+  const categoryId = req.params.categoryId;
+  if (!categoryId) {
+    return res.status(400).json({
+      message: "category ID Not found .",
+    });
+  }
+  const product = await Product.find({ category: categoryId }).populate({
+    path: 'size.optionGroups', // Populate the optionGroups field within each size
+  }).populate('optionGroups');
+
+  if (!product) {
+    return res.status(404).json({
+      message: "Product not found.",
+    });
+  }
+  return res.json(product);
+});
 module.exports = router;
 
 

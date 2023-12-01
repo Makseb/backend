@@ -50,9 +50,9 @@ app.use(express.json());
 app.use("/admin", adminRouter);
 app.use("/owner", ownerRouter);
 app.use("/client", clientRouter);
+
 let isConnected = false;
 require("dotenv").config();
-
 async function connectWithRetry() {
   try {
     await mongoose.connect(process.env.URI);
