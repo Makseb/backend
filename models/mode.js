@@ -35,6 +35,10 @@ const consumationModeSchema = new mongoose.Schema({
     type: Number, // You can adjust the type of "reduction" as needed (e.g., Number, String, etc.)
     required: true,
   },
+  minOrder: {
+    type: Number,
+    required: true,
+  },
 });
 
 const ConsumationMode = mongoose.model('ConsumationMode', consumationModeSchema);

@@ -105,17 +105,17 @@ router.post('/login', async (req, res, next) => {
 //   }
 // });
 
-router.post('/addStores', async (req, res) => {
+/*router.post('/addStores', async (req, res) => {
   try {
-    const { ownerId, name, description, address, phoneNumber } = req.body;
-
+    const { ownerId, name, description, address, phoneNumber,latitude,longitude ,rangeValue} = req.body;
+   console.log(name)
+    console.log(ownerId);
     // Check if the owner exists
     const owner = await User.findById(ownerId); // You should import the User model and define it appropriately.
-
+    //const storeId = req.params.storeId;
     if (!owner) {
       return res.status(404).json({ message: 'Owner not found' });
     }
-
     // Create a new store with the provided details
     const store = new Store({
       owner: ownerId,
@@ -123,22 +123,21 @@ router.post('/addStores', async (req, res) => {
       description,
       address,
       phoneNumber,
+      latitude,
+      longitude,
+      rangeValue
     });
-
     // Save the store to the database
     await store.save();
-
     // Add the created store to the owner's list of stores
     owner.stores.push(store._id);
     await owner.save();
-
     res.status(201).json({ message: 'Store created successfully', store });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'An error occurred while creating the store' });
   }
-});
-
+});*/
 // Service pour récupérer tous les stores d'un owner
 router.get('/stores/:ownerId',checkOwner, async (req, res) => {
   try {
@@ -167,9 +166,11 @@ router.post('/addCategory', upload.single('image'), async (req, res) => {
     const name = req.body.name;
     const userId = req.body.userId;
     const description = req.body.description;
+    const availabilitys = JSON.parse(req.body.availabilitys);
+
     const parentId = req.body.parentId;
     const image = req.file.filename;
-
+console.log(availabilitys);
     // Vérifier si la catégorie parente existe
     const parentCategory = parentId ? await Category.findById(parentId) : null;
     if (parentId && !parentCategory) {
@@ -187,6 +188,7 @@ router.post('/addCategory', upload.single('image'), async (req, res) => {
       name,
       store: storeId,
       description,
+      availabilitys,
       userId,
       image,
     });
@@ -213,7 +215,7 @@ router.post('/addCategory', upload.single('image'), async (req, res) => {
 
     // Récupérer l'ID de la catégorie parente
     const parentCategoryId = parentCategory ? parentCategory._id : null;
-
+    await category.populate('availabilitys.mode');
     res.status(201).json({ message: 'Catégorie créée avec succès', category, parentCategoryId });
   } catch (error) {
     console.error(error);
@@ -334,7 +336,7 @@ router.post('/affectOptionToGroup/:groupId/options/:optionId', async (req, res) 
     option.optionGroups.push(groupId);
     await option.save();
 
-    res.status(200).json({ message: 'Option affectée au groupe d\'options avec succès', name });
+    res.status(200).json({ message: 'Option affectée au groupe d\'options avec succès', name,image });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Une erreur est survenue lors de l\'affectation de l\'option au groupe d\'options' });
@@ -633,8 +635,8 @@ router.get('/getOptionGroups/:storeId',  async (req, res) => {
     const storeId = req.params.storeId;
   console.log(storeId);
     // Récupérer tous les groupes d'options associés à l'ownerId spécifié
-    const optionGroups = await GroupeOption.find({ store: storeId });
-  
+   // const optionGroups = await GroupeOption.find();
+    const optionGroups = await GroupeOption.find({ store: storeId }).populate('options.subOptionGroup').exec();
     res.json({ optionGroups });
   } catch (error) {
     console.error(error);
@@ -1131,7 +1133,7 @@ console.log(req.body.price);
     }
 
     // Update other product details if provided in the request body
-    const { name, description, price, storeId, category, size } = req.body;
+    const { name, description, price, storeId, category, size  } = req.body;
     const sizeData = JSON.parse(req.body.size);
 
     if (name) product.name = name;
@@ -1631,7 +1633,7 @@ router.put('/update/:productId', async (req, res) => {
 
 router.post('/addConsumationModes', async (req, res) => {
   try {
-    const { name, description, frais, taux, applyTaux, applicationType, storeId,reduction } = req.body;
+    const { name, description, frais, taux, applyTaux, applicationType, storeId,reduction,minOrder } = req.body;
 
     // Create and save the new consumation mode
     const newConsumationMode = new ConsumationMode({
@@ -1643,6 +1645,8 @@ router.post('/addConsumationModes', async (req, res) => {
       applicationType,
       store: storeId,
       reduction,
+      minOrder,
+
     });
     await newConsumationMode.save();
 console.log(newConsumationMode);
@@ -1924,35 +1928,37 @@ router.get('/getProudectWithGroupOption/:storeId',async(req,res)=>{
   }
   
 })
-router.put('/modifyOptionGroups/:id',upload.single('image'),async(req,res)=>
-{
-  try {
-    const {name, description} =req.body;
-    const image =req.file ? req.file.filename : undefined;
-    const optionGroupId = req.params.id;
-    const optionGroup = await GroupeOption.findById(optionGroupId)
-    if(!optionGroup)
-    {
-      res.status(404).json({message:'Groupe d\'options non trouvé'})
-    }
-    optionGroup.name=name;
-    optionGroup.description=description;
-    if(image)
-    {
-      optionGroup.image = image;
-    }
-    await optionGroup.save();
-    res.status(200).json({ message : 'groupe d\'option modifié avec succés', optionGroup })
-  } catch (error) {
-    res.status(500).json({ message: 'une erreur est survenue lors de la modification du groupe d\'option'})
-  }
-}
-);
+// router.put('/modifyOptionGroups/:id',async(req,res)=>
+// {
+//   try {
+//     console.log(req.body)
+//     const {name, description,force_max,force_min,allow_quantity} =req.body;
+//    console.log(force_min);
+//     const optionGroupId = req.params.id;
+//     const optionGroup = await GroupeOption.findById(optionGroupId)
+//     if(!optionGroup)
+//     {
+//       res.status(404).json({message:'Groupe d\'options non trouvé'})
+//     }
+//     optionGroup.name=name;
+//     optionGroup.description=description;
+//     optionGroup.force_max=force_max;
+//     optionGroup.force_min=force_min;
+//     optionGroup.allow_quantity=allow_quantity;
+   
+//     await optionGroup.save();
+//     res.status(200).json({ message : 'groupe d\'option modifié avec succés', optionGroup })
+//   } catch (error) {
+//     res.status(500).json({ message: 'une erreur est survenue lors de la modification du groupe d\'option'})
+//   }
+// }
+// );
 
 
 router.put('/modifyOptionGroup/:id', upload.single('image'), async (req, res) => {
   try {
-    const { name, description } = req.body;
+    console.log(req.body);
+    const {name, description,force_max,force_min,allow_quantity} =req.body;
 
     // Get the image file path from the request
     const image = req.file ? req.file.filename : undefined;
@@ -1970,6 +1976,9 @@ router.put('/modifyOptionGroup/:id', upload.single('image'), async (req, res) =>
     // Update the option group with the provided details, image path, and ownerId
     optionGroup.name = name;
     optionGroup.description = description;
+    optionGroup.force_max=force_max;
+    optionGroup.force_min=force_min;
+    optionGroup.allow_quantity=allow_quantity;
     if (image) {
       optionGroup.image = image;
     }
@@ -2116,28 +2125,33 @@ router.post('/api/products/:productId/size/:sizeId/option-groups', async (req, r
 // });
 router.post('/addproduct', async (req, res) => {
   try {
-    const productData = req.body; // Assuming you're sending product data in the request body
-     console.log(productData);
+    const productData = req.body;
+
     // Create a new product using the Product model
     const product = new Product(productData);
 
     // Save the product to the database
     await product.save();
-  // Assuming productData contains the category ID
-  const categoryId = productData.category;
 
-  // Find the category by ID and update the products array
-  await Category.findByIdAndUpdate(
-    categoryId,
-    { $push: { products: product._id } }, // Assuming product._id is the ID of the newly added product
-    { new: true }
-  );
+    // Assuming productData contains the category ID
+    const categoryId = productData.category;
 
+    // Find the category by ID and update the products array
+    await Category.findByIdAndUpdate(
+      categoryId,
+      { $push: { products: product._id } },
+      { new: true }
+    );
+
+    // Populate the 'mode' field in the 'availabilitys' array
+    await product.populate('availabilitys.mode');
     res.status(201).json(product);
   } catch (err) {
+    console.error('Error adding product:', err);
     res.status(500).json({ error: 'Error adding product' });
   }
 });
+
 router.post('/uploadImage', upload.single('image'), (req, res) => {
   // Check if an image file was uploaded
   if (!req.file) {
@@ -2234,6 +2248,7 @@ router.post('/duplicate/:productId', async (req, res) => {
       { $push: { products: duplicatedProduct._id } },
       { new: true }
     ).exec();
+    await duplicatedProduct.populate('availabilitys.mode');
     return res.json({ success: true, message: 'Product duplicated successfully', duplicatedProduct });
   } catch (error) {
     console.error(error);
@@ -2244,7 +2259,7 @@ router.get("/orders/:storeId", async (req, res) => {
   try {
     const storeId = req.params.storeId;
     // Find orders for the given store ID
-    const orders = await Order.find({ "store": storeId })
+    const orders = await Order.find({ "storeId": storeId })
     if (!orders) {
       return res.status(404).json({ message: "No orders found for the given store ID" });
     }
@@ -2397,9 +2412,16 @@ router.get('/getMenuByStore/:storeId', async (req, res) => {
                               path: 'taxes',
                               model: 'Tax',
                           },
+                          {
+                            path: 'availabilitys.mode',
+                            model: 'ConsumationMode',
+                          }
                       ],
                   },
-                  
+                  {
+                    path: 'availabilitys.mode',
+                    model: 'ConsumationMode',
+                  },
               ],
           })
           .exec();
@@ -2549,8 +2571,8 @@ router.post('/addOptionGroupToOG/:optionGroupId/:parentOptionGroupId/:optionId',
     }
 
     await parentOptionGroup.save();
-
-    res.status(201).json({ message: 'OptionGroup ID added successfully to oG array', optionGroupId });
+    const updatedParentOptionGroup = await GroupeOption.findById(parentOptionGroupId);
+    res.status(201).json({ message: 'OptionGroup ID added successfully to oG array', updatedParentOptionGroup });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'An error occurred while adding OptionGroup ID to oG array' });
@@ -2819,6 +2841,593 @@ router.get("/productByCategory/:categoryId", async (req, res) => {
     });
   }
   return res.json(product);
+});
+router.get('/products-by-store/:storeId/:modeId', async (req, res) => {
+  try {
+    const storeId = req.params.storeId;
+    const modeId = req.params.modeId;
+
+    const products = await Product.find({ storeId: storeId }).populate({
+      path: 'size.optionGroups',
+    }).populate('optionGroups')
+      .populate({
+        path: 'taxes',
+        match: { 'mode': modeId },
+        select: 'mode',
+      })
+      .populate({
+        path: 'availabilitys',
+        match: { 'mode': modeId },
+        select: 'mode',
+      })
+      .exec();
+
+    // Filter products based on the specified mode ID
+    const filteredProducts = products.map(product => {
+      const { _id, name, description, availabilitys, size, optionGroups, storeId, category, price, image, taxes } = product;
+
+      return {
+        _id,
+        name,
+        description,
+        availabilitys: availabilitys.filter(avail => avail.mode.toString() === modeId),
+        size,
+        optionGroups,
+        storeId,
+        category,
+        price,
+        image,
+        taxes: taxes.filter(tax => tax.mode.toString() === modeId),
+      };
+    });
+
+    res.json(filteredProducts);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+router.put('/products/:productId/mode/:modeId/toggle-availability', async (req, res) => {
+  try {
+    const productId = req.params.productId;
+    const modeId = req.params.modeId;
+
+    // Find the product by ID
+    const product = await Product.findById(productId);
+
+    // Find the mode within the product's availabilitys array
+    const mode = product.availabilitys.find((item) => item.mode.equals(modeId));
+
+    if (!mode) {
+      return res.status(404).json({ message: 'Mode not found in product availabilitys' });
+    }
+
+    // Toggle the availability
+    mode.availability = !mode.availability;
+    const etat =mode.availability
+
+    // Save the updated product
+    await product.save();
+
+    res.json({ message: 'Availability toggled successfully', etat });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+router.put('/category/:categoryId/mode/:modeId/toggle-availability', async (req, res) => {
+  try {
+    const categoryId = req.params.categoryId;
+    const modeId = req.params.modeId;
+
+    // Find the product by ID
+    const category = await Category.findById(categoryId);
+
+    // Find the mode within the product's availabilitys array
+    const mode = category.availabilitys.find((item) => item.mode.equals(modeId));
+
+    if (!mode) {
+      return res.status(404).json({ message: 'Mode not found in product availabilitys' });
+    }
+
+    // Toggle the availability
+    mode.availability = !mode.availability;
+    const etat =mode.availability
+
+    // Save the updated product
+    await category.save();
+
+    res.json({ message: 'Availability toggled successfully', etat });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+router.put('/products/:productId/toggle-availability', async (req, res) => {
+  const { productId } = req.params;
+
+  try {
+    // Find the product by ID
+    const product = await Product.findById(productId);
+
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    // Toggle the availability
+    product.availability = !product.availability;
+
+    // Save the updated product
+    const updatedProduct = await product.save();
+
+    // Respond with the updated product
+    res.json(updatedProduct);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+router.put('/categorys/:categoryId/toggle-availability', async (req, res) => {
+  const { categoryId } = req.params;
+
+  try {
+    // Find the product by ID
+    const category = await Category.findById(categoryId);
+
+    if (!category) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    // Toggle the availability
+    category.availability = !category.availability;
+
+    // Save the updated product
+    const updatedCategory = await category.save();
+
+    // Respond with the updated product
+    res.json(updatedCategory);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+//deleteStores
+router.delete('/deleteStores/:storeId',checkOwner, async (req, res) => {
+  try {
+    const storeId = req.params.storeId;
+    // Vérifier si le magasin existe
+    const store = await Store.findById(storeId);
+    if (!store) {
+      return res.status(404).json({ message: 'Magasin non trouvé' });
+    }
+    // Supprimer le magasin de la base de données
+    await Store.findByIdAndRemove(storeId);
+    res.json({ message: 'Magasin supprimé avec succès' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Une erreur est survenue lors de la suppression du magasin' });
+  }
+});
+//getstoresById
+router.get('/getStoresById/:id', checkOwner, async (req, res) => {
+  try {
+    const storesId = req.params.id;
+    // Retrieve the owner from the database based on the provided ID
+    const stores = await Store.findById(storesId);
+    if (!stores) {
+      return res.status(404).json({ message: 'stores not found' });
+    }
+    res.json(stores);
+    console.log(stores);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'An error occurred while retrieving the stores' });
+  }
+});
+// update Stores
+router.put('/updateStores/:storesId', async (req, res) => {
+  const storesId = req.params.storesId; // Correction : Utilisez req.params.storesId
+  try {
+    const store = await Store.findById(storesId);
+    if (!store) {
+      return res.status(404).json({ message: 'Store not found' });
+    }
+    // Mettez à jour les propriétés du magasin avec les nouvelles données de la requête
+    store.name = req.body.name;
+    store.description = req.body.description;
+    store.address = req.body.address;
+    store.phoneNumber = req.body.phoneNumber;
+    store.latitude = req.body.latitude;
+    store.longitude = req.body.longitude;
+    store.rangeValue = req.body.rangeValue;
+    await store.save();
+    res.json({ message: 'Stores information updated successfully', store });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+router.post('/api/products/:productId/availability', async (req, res) => {
+  try {
+    const productId = req.params.productId;
+    const product = await Product.findById(productId);
+
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    // If the request contains 'availability', update the product's overall availability
+    if (req.body.hasOwnProperty('availability')) {
+      product.availability = req.body.availability;
+    }
+
+    // If the request contains 'availabilitys', add new availabilities only if they are not already present
+    if (req.body.hasOwnProperty('availabilitys')) {
+      const newAvailabilities = req.body.availabilitys.map((availability) => ({
+        availability: availability.availability,
+        mode: availability.mode,
+      }));
+
+      for (const newAvailability of newAvailabilities) {
+        const isDuplicate = product.availabilitys.some(
+          (existingAvailability) =>
+            existingAvailability.mode.toString() === newAvailability.mode.toString()
+        );
+
+        if (!isDuplicate) {
+          product.availabilitys.push(newAvailability);
+        }
+      }
+    }
+
+    const savedProduct = await product.save();
+    res.json(savedProduct);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+router.post('/api/categorys/:categoryId/availability', async (req, res) => {
+  try {
+    const categoryId = req.params.categoryId;
+    const category = await Category.findById(categoryId);
+
+    if (!category) {
+      return res.status(404).json({ message: 'category not found' });
+    }
+
+    // If the request contains 'availability', update the product's overall availability
+    if (req.body.hasOwnProperty('availability')) {
+      category.availability = req.body.availability;
+    }
+
+    // If the request contains 'availabilitys', add new availabilities only if they are not already present
+    if (req.body.hasOwnProperty('availabilitys')) {
+      const newAvailabilities = req.body.availabilitys.map((availability) => ({
+        availability: availability.availability,
+        mode: availability.mode,
+      }));
+
+      for (const newAvailability of newAvailabilities) {
+        const isDuplicate = category.availabilitys.some(
+          (existingAvailability) =>
+            existingAvailability.mode.toString() === newAvailability.mode.toString()
+        );
+
+        if (!isDuplicate) {
+          category.availabilitys.push(newAvailability);
+        }
+      }
+    }
+
+    const savedCategory = await category.save();
+    res.json(savedCategory);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+router.post('/addCompany', async (req, res) => {
+  try {
+    const { ownerId,name, legalstatus, duns, address, phone,email,website } = req.body;
+    console.log(ownerId);
+    // Check if the owner exists
+    const owner = await User.findById(ownerId); // You should import the User model and define it appropriately.
+    //const storeId = req.params.storeId;
+    if (!owner) {
+      return res.status(404).json({ message: 'Owner not found' });
+    }
+    const company = new Company({
+      owners:ownerId,
+      name,
+      legalstatus,
+      duns,
+      address,
+      phone,
+      email,
+      website
+    });
+    await company.save();
+   // Add the created store to the owner's list of stores
+   owner.stores.push(company._id);
+   await owner.save();
+    res.status(201).json({ message: 'Company created successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'An error occurred while creating the Company' });
+  }
+});
+//AddCompany
+router.post('/addCompany', async (req, res) => {
+  try {
+    const { ownerId,name, legalstatus, duns, address, phone,email,website } = req.body;
+    console.log(ownerId);
+    // Check if the owner exists
+    const owner = await User.findById(ownerId); // You should import the User model and define it appropriately.
+    //const storeId = req.params.storeId;
+    if (!owner) {
+      return res.status(404).json({ message: 'Owner not found' });
+    }
+    // Create a new store with the provided details
+    const company = new Company({
+      owners:ownerId,
+      name,
+      legalstatus,
+      duns,
+      address,
+      phone,
+      email,
+      website
+    });
+    await company.save();
+   // Add the created store to the owner's list of stores
+   owner.stores.push(company._id);
+   await owner.save();
+    res.status(201).json({ message: 'Company created successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'An error occurred while creating the Company' });
+  }
+});  //addcolor
+router.post('/stores/:storeId/colors', async (req, res) => {
+  try {
+    const   primairecolor = req.body.primairecolor;
+    const   secondairecolor = req.body.secondairecolor;
+    const storeId = req.params.storeId;
+    const store = await Store.findById(storeId);
+    if (!store) {
+      return res.status(404).json({ error: 'Store not found' });
+    }
+    store.primairecolor=primairecolor,
+    store.secondairecolor=secondairecolor;
+    // Save the updated store
+    await store.save();
+    res.status(201).json(store);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+// Get Color
+router.get('/stores/:storeId/colors', async (req, res) => {
+  const storeId = req.params.storeId;
+  try {
+    //const storeId = req.params.storeId;
+    console.log('Requested storeId:', storeId);
+    const store = await Store.findById(storeId);
+    console.log('Retrieved store:', store);
+    if (!store) {
+      return res.status(404).json({ error: 'Store not found' });
+    }
+    res.status(200).json({
+      primairecolor: store.primairecolor,
+      secondairecolor: store.secondairecolor
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+}); 
+
+//AddStores
+router.post('/addStores', async (req, res) => {
+  try {
+    const { ownerId, name, description, address, phoneNumber, latitude, longitude, rangeValue, openingHours } = req.body;
+    // Check if the owner exists
+    const owner = await User.findById(ownerId); // You should import the User model and define it appropriately.
+    if (!owner) {
+      return res.status(404).json({ message: 'Owner not found' });
+    }
+    // Create a new store with the provided details
+    const store = new Store({
+      owner: ownerId,
+      name,
+      description,
+      address,
+      phoneNumber,
+      latitude,
+      longitude,
+      rangeValue,
+      openingdate: openingHours, // Include opening hours in the store creation
+    });
+    // Save the store to the database
+    await store.save();
+    // Add the created store to the owner's list of stores
+    owner.stores.push(store._id);
+    await owner.save();
+    res.status(201).json({ message: 'Store created successfully', store });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'An error occurred while creating the store' });
+  }
+});
+
+//orders
+router.get("/orders/:storeId", async (req, res) => {
+  try {
+    const storeId = req.params.storeId;
+    console.log(storeId);
+    // Find orders for the given store ID
+    const orders = await Order.find({ "storeId": storeId });
+    console.log(orders);
+    if (orders.length === 0) {
+      return res.status(404).json({ message: "No orders found for the given store ID" });
+    }
+    res.status(200).json(orders);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+//getorderbyid
+router.get('/getOrdersById/:id', checkOwner, async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    // Retrieve the owner from the database based on the provided ID
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ message: 'stores not found' });
+    }
+    res.json(order);
+    console.log(order);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'An error occurred while retrieving the stores' });
+  }
+});
+//update orders  status
+// update Orders
+router.put('/updateOrders/:storesId', async (req, res) => {
+  const orderId = req.params.storesId;
+  const status = req.body.Data;
+  try {
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+    // Extract the status from the request body
+console.log(status)
+    // Update the order status
+    order.status = status;
+    await order.save();
+    res.json({ message: 'Order information updated successfully', order });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+router.delete('/option-groups/:groupId/options/:optionId',async (req, res) => {
+  try {
+    const groupId = req.params.groupId;
+    const optionId = req.params.optionId;
+
+    // Find the option group by ID
+    const optionGroup = await GroupeOption.findById(groupId);
+
+    if (!optionGroup) {
+      return res.status(404).json({ error: 'Option group not found' });
+    }
+
+    // Find the index of the option to be deleted
+    const optionIndex = optionGroup.options.findIndex(opt => opt._id.toString() === optionId);
+
+    if (optionIndex === -1) {
+      return res.status(404).json({ error: 'Option not found in the option group' });
+    }
+
+    // Remove the option from the options array
+    optionGroup.options.splice(optionIndex, 1);
+
+    // Save the updated option group
+    await optionGroup.save();
+
+    return res.status(200).json({ message: 'Option deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+router.put('/option/:groupId/:optionId', async (req, res) => {
+  try {
+    const groupId = req.params.groupId;
+    const optionId = req.params.optionId;
+
+    // Assuming req.body contains the updated properties (price, isDefault)
+    const { price, isDefault } = req.body;
+
+    // Find the OptionGroup by groupId
+    const optionGroup = await GroupeOption.findById(groupId);
+    if (!optionGroup) {
+      return res.status(404).json({ message: 'OptionGroup not found' });
+    }
+
+    // Find the index of the option within the options array
+    const optionIndex = optionGroup.options.findIndex(
+      (opt) => opt._id.toString() === optionId
+    );
+
+    if (optionIndex === -1) {
+      return res.status(404).json({ message: 'Option not found within OptionGroup' });
+    }
+
+    // Update the properties
+    if (price !== undefined) {
+      optionGroup.options[optionIndex].price = price;
+    }
+
+    if (isDefault !== undefined) {
+      optionGroup.options[optionIndex].isDefault = isDefault;
+    }
+
+    // Save the updated OptionGroup
+    await optionGroup.save();
+
+    res.json({ message: 'Option updated successfully', optionGroup });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+router.delete('/:optionGroupId/options/:optionId/subOptionGroups/:subOptionGroupId', async (req, res) => {
+  const { optionGroupId, optionId, subOptionGroupId } = req.params;
+
+  try {
+    // Find the parent optionGroup by ID
+    const optionGroup = await GroupeOption.findById(optionGroupId);
+
+    // Check if the optionGroup exists
+    if (!optionGroup) {
+      return res.status(404).json({ error: 'OptionGroup not found' });
+    }
+
+    // Find the specified option within the optionGroup
+    const option = optionGroup.options.find(opt => opt._id == optionId);
+
+    // Check if the option exists
+    if (!option) {
+      return res.status(404).json({ error: 'Option not found' });
+    }
+
+    // Find the index of the subOptionGroup to be deleted within the specified option
+    const subOptionGroupIndex = option.subOptionGroup.indexOf(subOptionGroupId);
+
+    // Check if the subOptionGroup exists
+    if (subOptionGroupIndex === -1) {
+      return res.status(404).json({ error: 'SubOptionGroup not found' });
+    }
+
+    // Remove the subOptionGroup from the array within the specified option
+    option.subOptionGroup.splice(subOptionGroupIndex, 1);
+
+    // Save the updated optionGroup
+    await optionGroup.save();
+
+    res.json({ message: 'SubOptionGroup deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
 module.exports = router;
 

@@ -11,6 +11,7 @@ const order = require("../models/order.js");
 const multer = require("multer");
 const path = require("path");
 const Option = require("../models/productOption.js");
+const Menu = require("../models/menu.js");
 const Product = require("../models/product.js");
 const Category = require("../models/category.js");
 const Company = require("../models/company.js");
@@ -24,6 +25,9 @@ const { sendWelcomeEmail } = require("../emailService.js");
 const Mail = require("nodemailer/lib/mailer/index.js");
 const { sendForgetpasswordclient } = require("../emailService.js");
 const { sendVerificationClient } = require("../emailService.js");
+const optionGroupe = require("../models/optionGroupe.js");
+const ProductOption = require("../models/productOption.js");
+const schedule = require("node-schedule");
 require("../middlewares/passportSetup");
 
 //signup
@@ -271,6 +275,7 @@ router.get(
         );
       } else {
         res.cookie("token", accessToken);
+        res.cookie("user", JSON.stringify(user));
         res.redirect("http://localhost:3000");
       }
     } catch (err) {
@@ -329,14 +334,28 @@ router.get("/companies", async (req, res) => {
   const companies = await Company.find();
   res.send(companies);
 });
-
+//get storeByid
+router.get("/store/:storeId",async (req,res)=>{
+  const storeId=req.params.storeId
+  try{
+    const store = await Store.findById(storeId)
+    
+    if (!store) {
+      return res.status(404).json({ error: 'Store not found' });
+    }
+    res.status(200).json(store)
+  }catch (err) {
+    console.error("Error fetching store: ", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+})
 // get store by company
 router.get("/storeByCompany/:companyId", async (req, res) => {
   const companyId = req.params.companyId;
   try {
     const stores = await Store.find({ company: companyId }).populate(
       "categories products"
-    )
+    );
     if (stores.length === 0) {
       return res
         .status(404)
@@ -367,6 +386,41 @@ router.get("/storeByOwner/:ownerId", async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+//get menu by store
+router.get("/getMenuByStore/:storeId", async (req, res) => {
+  try {
+    const storeId = req.params.storeId;
+    const menu = await Menu.find({ store: storeId })
+      .populate({
+        path: "categorys",
+        populate: [
+          {
+            path: "products",
+            model: "Product",
+            populate: [
+              {
+                path: "size.optionGroups",
+                model: "OptionGroup",
+              },
+              {
+                path: "optionGroups",
+                model: "OptionGroup",
+              },
+              {
+                path: "taxes",
+                model: "Tax",
+              },
+            ],
+          },
+        ],
+      })
+      .exec();
+    res.json(menu);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
 
 //get product ByStore
 router.get("/productByStore/:storeId", async (req, res) => {
@@ -376,9 +430,15 @@ router.get("/productByStore/:storeId", async (req, res) => {
     const products = await Product.find({ storeId })
       .populate({
         path: "size.optionGroups",
+        populate: {
+          path: "options.subOptionGroup",
+        },
       })
       .populate({
         path: "optionGroups",
+        populate: {
+          path: "options.subOptionGroup",
+        },
       });
 
     if (!products) {
@@ -393,7 +453,6 @@ router.get("/productByStore/:storeId", async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
-
 //get category ByStore
 router.get("/categoryByStore/:id", async (req, res) => {
   const id = req.params.id;
@@ -438,25 +497,75 @@ router.get("/productByCategory/:categoryId", async (req, res) => {
 });
 
 //create order
-router.post("/orders", checkClient, async (req, res) => {
+router.post("/orders", async (req, res) => {
+  console.log(req.body);
   try {
-    const userId = req.user.id;
-    const newOrder = new order({
-      userId: userId,
-      ...req.body,
-    });
+    const items = req.body;
+    const newOrder = await new order(items);
 
     const validationError = newOrder.validateSync();
     if (validationError) {
       return res.status(400).json({ error: validationError.message });
     }
 
-    await newOrder.save();
+    const data = await newOrder.save();
+
+    const newDate = new Date(data.createdAt.getTime() + 180 * 1000);
+
+    const formattedDate = newDate
+      .toISOString()
+      .replace(/\.(\d{3})Z$/, ".$1+00:00");
+
+    const finalDate = new Date(formattedDate);
+
+    const job = schedule.scheduleJob(finalDate, function () {
+      const lastData = async () => {
+        const lastOrder = await order.findOne({ _id: data._id });
+        if (lastOrder.status === "pending") {
+          await order.findOneAndUpdate(
+            { _id: data._id },
+            { status: "missed", updatedAt: Date.now() },
+            { new: true }
+          );
+          console.log("updated");
+        }
+      };
+      lastData();
+    });
 
     res.status(201).json(newOrder);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to create order" });
+  }
+});
+// update status of order by id (from restaurant's owner)
+router.put("/order/updatestatus", async (req, res) => {
+  try {
+    const { status, _id } = req.body;
+    if (status && _id) {
+      const updateStatus = await order.findOneAndUpdate(
+        { _id: _id },
+        { status, updatedAt: Date.now() },
+        { new: true }
+      );
+      if (!updateStatus) {
+        return res.status(404).json({
+          message: "Order not found.",
+        });
+      }
+      return res.status(200).json({
+        message: "Status of order does modify successfully.",
+        order: updateStatus,
+      });
+    }
+    return res.status(400).json({
+      message: "No data found. Failed to update order's status.",
+    });
+  } catch (err) {
+    return res.status(500).json({
+      message: err?.message,
+    });
   }
 });
 
@@ -512,11 +621,140 @@ router.post("/createCompany", async (req, res) => {
     res.status(201).json({ message: "Company créé avec succès", company });
   } catch (error) {
     console.error(error);
-    res
-      .status(500)
-      .json({
-        message: "Une erreur est survenue lors de la création du company",
-      });
+    res.status(500).json({
+      message: "Une erreur est survenue lors de la création du company",
+    });
+  }
+});
+//get user information by email
+router.get("/userInformation/:email", async (req, res) => {
+  try {
+    const email = req.params.email;
+    console.log(email);
+    const userInformation = await User.findOne({ email });
+    res.status(201).json({ userInformation });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Une erreur est survenue lors de get user information ",
+    });
+  }
+});
+
+router.get("/stores/:storeId/colors", async (req, res) => {
+  const storeId = req.params.storeId;
+  try {
+    //const storeId = req.params.storeId;
+    // console.log("Requested storeId:", storeId);
+    const store = await Store.findById(storeId);
+    // console.log("Retrieved store:", store);
+    if (!store) {
+      return res.status(404).json({ error: "Store not found" });
+    }
+    res.status(200).json({
+      primairecolor: store.primairecolor,
+      secondairecolor: store.secondairecolor,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+//storebyMode
+router.get("/storeByMode/:modeId", async (req, res) => {
+  try {
+    const modeId = req.params.modeId;
+
+    // Find stores that have the specified consumationMode enabled
+    const stores = await Store.find({
+      "consumationModes.mode": modeId,
+      "consumationModes.enabled": true,
+    }).populate("consumationModes.mode");
+
+    res.json({ stores });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+//mode conso store
+router.get("/modeConsomation/:storeid", async (req, res) => {
+  const id = req.params.storeid;
+  try {
+    const store = await Store.findById(id).populate("consumationModes.mode");
+    if (!store) {
+      return res.status(404).json({ error: "Store not found" });
+    }
+
+    // Extract consumationModes from the store
+    const consumationModes = store.consumationModes;
+
+    res.json({ consumationModes });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// product by mode
+router.get("/products-by-store/:storeId/:modeId", async (req, res) => {
+  try {
+    const storeId = req.params.storeId;
+    const modeId = req.params.modeId;
+    const products = await Product.find({ storeId: storeId })
+      .populate({
+        path: "size.optionGroups",
+      })
+      .populate("optionGroups")
+      .populate({
+        path: "taxes",
+        match: { mode: modeId },
+        select: "mode",
+      })
+      .populate({
+        path: "availabilitys",
+        match: { mode: modeId },
+        select: "mode",
+      })
+      .exec();
+    // Filter products based on the specified mode ID
+    const filteredProducts = products.map((product) => {
+      const {
+        _id,
+        name,
+        description,
+        availability,
+        availabilitys,
+        size,
+        optionGroups,
+        storeId,
+        category,
+        price,
+        image,
+        taxes,
+      } = product;
+      return {
+        _id,
+        name,
+        description,
+        availability,
+        availabilitys: availabilitys.filter(
+          (avail) => avail.mode.toString() === modeId
+        ),
+        size,
+        optionGroups,
+        storeId,
+        category,
+        price,
+        image,
+        // taxes: taxes.filter(tax => tax.mode.toString() === modeId),
+      };
+    });
+    res.status(200).json(filteredProducts);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 

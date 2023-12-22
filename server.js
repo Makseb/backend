@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const http = require("http");
 const adminRouter = require("./routers/adminRouter");
 const ownerRouter = require("./routers/ownerRouter");
+const managerRouter = require("./routers/managerRouter");
 const cors = require("cors");
 const app = express();
 const server = http.createServer(app);
@@ -14,6 +15,7 @@ const passport = require("passport");
 const passportSetup = require('./middlewares/passportSetup')
 const cookieSession = require("cookie-session")
 const cookieParser = require("cookie-parser");
+
 app.use(express.static(path.join(__dirname, "views")));
 
 app.use(express.static("uploads"));
@@ -50,7 +52,7 @@ app.use(express.json());
 app.use("/admin", adminRouter);
 app.use("/owner", ownerRouter);
 app.use("/client", clientRouter);
-
+app.use("/manager", managerRouter);
 let isConnected = false;
 require("dotenv").config();
 async function connectWithRetry() {

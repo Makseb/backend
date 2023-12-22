@@ -55,20 +55,7 @@ const storeSchema = new mongoose.Schema({
     type: String,
     required: false,
   }],
-  banners: [{
-    imageUrl: {
-      type: String,
-      required: true,
-    },
-    description: {
-      type: String,
-      required: false,
-    },
-    link: {
-      type: String,
-      required: false,
-    },
-  }],
+ 
   consumationModes: [{
     mode: {
       type: mongoose.Schema.Types.ObjectId,
@@ -88,7 +75,80 @@ const storeSchema = new mongoose.Schema({
   }
   ],
 
-
+  active: {
+    type: Boolean,
+    default: true,
+    required: true
+  },
+  openingdate: [{
+    Monday: {
+      isOpen: { type: Boolean }, // Use Boolean for true/false values
+      shifts: [
+        {
+          start: { type: String },
+          end: { type: String }
+        },
+      ]
+    },
+    Tuesday: {
+      isOpen: { type: Boolean }, // Use Boolean for true/false values
+      shifts: [
+        {
+          start: { type: String },
+          end: { type: String }
+        },
+      ]
+    },
+    Wednesday: {
+      isOpen: { type: Boolean }, // Use Boolean for true/false values
+      shifts: [
+        {
+          start: { type: String },
+          end: { type: String }
+        },
+      ]
+    },
+    Thursday: {
+      isOpen: { type: Boolean }, // Use Boolean for true/false values
+      shifts: [
+        {
+          start: { type: String },
+          end: { type: String }
+        },
+      ]
+    },
+    Friday: {
+      isOpen: { type: Boolean }, // Use Boolean for true/false values
+      shifts: [
+        {
+          start: { type: String },
+          end: { type: String }
+        },
+      ]
+    },
+    Saturday: {
+      isOpen: { type: Boolean }, // Use Boolean for true/false values
+      shifts: [
+        {
+          start: { type: String },
+          end: { type: String }
+        },
+      ]
+    },
+    Sunday: {
+      isOpen: { type: Boolean }, // Use Boolean for true/false values
+      shifts: [
+        {
+          start: { type: String },
+          end: { type: String }
+        },
+      ]
+    },
+}],
+defaultMode: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "ConsumationMode",
+},
 });
 
 module.exports = mongoose.model('Store', storeSchema);

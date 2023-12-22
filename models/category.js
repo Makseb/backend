@@ -14,6 +14,21 @@ const categorySchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  availability:{
+    type:Boolean,
+    default:true
+  },
+  availabilitys:[ {
+    availability:{
+    type:Boolean,
+  },
+    mode: {
+      type: mongoose.Schema.Types.ObjectId,
+
+      ref: 'ConsumationMode',
+      required: true,
+    },
+}],
   parentId: {
     type: String,
     required: false,

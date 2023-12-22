@@ -8,6 +8,10 @@ const productSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  availability:{
+    type:Boolean,
+    default:true
+  },
   availabilitys:[ {
     availability:{
     type:Boolean,
@@ -64,7 +68,7 @@ const productSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId,
 
       ref: 'ConsumationMode',
-      required: true,
+      required: false,
     },
   }],
 });

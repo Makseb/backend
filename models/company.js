@@ -16,6 +16,26 @@ const companySchema = new mongoose.Schema({
         type: Boolean,
         default: 'false',
       },
+      legalstatus: {
+        type: String,
+        default: "pending",
+      },
+      duns: {
+        type: String,
+        required: true,
+      },
+      address: {
+        type: String,
+        required: true,
+      },
+      phone: {
+        type: Number,
+      },
+      email: {
+        type: String,
+      },
+      website: {
+        type: String,
+      },
 });
-
 module.exports = mongoose.model('Company', companySchema);
