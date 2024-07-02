@@ -1,0 +1,20 @@
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
+PassengerAppRoot "/home/vebi0619/public_html/sandbox01/api"
+PassengerBaseURI "/"
+PassengerNodejs "/home/vebi0619/nodevenv/public_html/sandbox01/api/20/bin/node"
+PassengerAppType node
+PassengerStartupFile server.js
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
+RewriteEngine on
+
+# DO NOT REMOVE OR MODIFY. CLOUDLINUX ENV VARS CONFIGURATION BEGIN
+<IfModule Litespeed>
+SetEnv PORT 	8000
+SetEnv URI mongodb+srv://makseb77:makseb77@maksebdb.pljkidi.mongodb.net/test?retryWrites=true&w=majority
+SetEnv GOOGLEClientId 701908396935-hel1t4sn9ngnu2rf7l69gkbmambqnji6.apps.googleusercontent.com
+SetEnv GOOGLEClientSecret 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
+SetEnv GOOGLECallbackURL http://api.eatorder.fr/client/google/callback
+</IfModule>
+# DO NOT REMOVE OR MODIFY. CLOUDLINUX ENV VARS CONFIGURATION END
+RewriteCond %{HTTP_HOST} ^api\.eatorder\.fr$
+RewriteRule ^/?$ "http\:\/\/141\.94\.96\.93\:8000\/" [R=301,L]
